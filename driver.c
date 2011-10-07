@@ -10,8 +10,11 @@
 
 #include <time.h>
 
-#include "code.h"
+#include "driver.h"
 
+/**
+ * Stack size of the task which check the availabity of datas from sensors.
+ */
 #define STACK_SIZE_CHECK 1000
 
 /**
@@ -20,16 +23,18 @@
 static int num_drv = ERROR;
 
 /**
- * Semaphore to simulate an interrupt.
+ * Semaphore to simulate an interrupt, 
+ * It's full if a sensor emmited data, emptied if read.
  */
 static SEM_ID sem_id;
 
+/**
+ * Id of the task to check the availability of the data.
+ */
 static int check_task_id;
 
-
-
 /**
- * Minimal Driver Structure.
+ * Device(sensor) Structure, with the last data given.
  */
 typedef struct{
 	DEV_HDR devHdr;
@@ -37,23 +42,33 @@ typedef struct{
 } myDev;
 
 /**
- * Keep the devices associated with the driver.
- * The access is direct with the dev id.
+ * List of the devices associated to the driver.
+ * It keep a pointer to the device in the device table,
+ * and is indexed with the device id.
  */
 static myDev *listDev[MAX_DEV];
 
-double getTime() {
+/**
+ * Return the actual time in milliseconds (To Verify).
+ */
+unsigned long getTime() {
 	struct timespec timev;
-	long nano;
+	unsigned long nano;
 	time_t sec;
 	
 	clock_gettime(CLOCK_REALTIME, &timev);
 	nano = timev.tv_nsec;
 	sec = timev.tv_sec;
 	
-	return sec + nano/1000000000;
+	return (sec*1000 + nano/1000000) % MAX_LONG;
 }
 
+/**
+ * Function, used as a motor for a task.
+ * It wait for the semaphore to be full,
+ * then get the message, the associated device,
+ * and create a message for the application.
+ */
 void check_message() {
 	
 	MesSenToDrv myMes;
@@ -73,7 +88,7 @@ void check_message() {
 }
 
 /**
- * Driver Basic Functions to Implement.
+ * TODO Driver Basic Functions to Implement.
  */
 void myOpen() {}
 void myClose() {}
@@ -83,6 +98,8 @@ void myIoCtl() {}
 /**
  * If it not installed, we do it and we return the driver number,
  * even if it's already installed.
+ * 
+ * We initialise the device list, and create a task which "check the sensors".
  */
 int install(int priority) {
 	if(num_drv == ERROR) {
@@ -104,12 +121,21 @@ int uninstall() {
 		return ERROR;
 	iosDrvRemove(num_drv,0);
 	num_drv = ERROR;
+	
+	/* TODO
+	 *   Stop the task
+	 *   Remove the Semaphore
+	 * 	 Maybe we have to free the devices attached...
+	 */
+	
 	return OK;	
 }
 
 /**
  * If the driver is installed, we allocate a driver struct,
  * and we add it to the Device table.
+ * 
+ * We add the device to the list.
  */
 int add_dev(char *name, ID_T id) {
 	myDev *oneDev;
@@ -128,7 +154,7 @@ int add_dev(char *name, ID_T id) {
 }
 
 /**
- * Delete a device by his name, and check if it belongs to our driver.
+ * Delete a device by his ID, and check if it belongs to our driver.
  * Free the driver struct.
  */
 int del_dev(ID_T id) {
@@ -148,10 +174,27 @@ int del_dev(ID_T id) {
 	return OK;
 }
 
+/**
+ * Function used by the concentrator to 
+ * say that there is data available.
+ */
 void message_available() {
 	semGive(sem_id);
 }
 
+/**
+ * Get the id of a device associated by his name.
+ * Return MAX_DEV if not found.
+ */
+ID_T get_dev_by_name(char *name) {
+	int i;
+	for(i=0; i<MAX_DEV;i++) {
+		if(strcmp(listDev[i], name) == 0) {
+			return i;
+		}
+	}
+	return MAX_DEV;
+}
 
 
 
