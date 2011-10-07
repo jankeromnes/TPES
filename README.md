@@ -6,7 +6,7 @@ Le code est encore en chantier.
 
 **TODO**
 
-* Suivre les "TODO" dans le code pour voir les choses à faire (notemment open/close...)
+* Suivre les "TODO" dans le code pour voir les choses à faire (notamment open/close...)
 
 * Créer le simulateur.
 
